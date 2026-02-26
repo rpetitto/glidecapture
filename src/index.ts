@@ -4,10 +4,24 @@ import { program } from "commander";
 import chalk from "chalk";
 import ora from "ora";
 import path from "node:path";
+import readline from "node:readline";
 import type { CrawlConfig } from "./types.js";
 import { crawl } from "./crawler.js";
 import { analyzeERD } from "./erd-analyzer.js";
 import { generateReports } from "./report.js";
+
+/**
+ * Prompt the user for input on stdin. Used to collect a verification code mid-login.
+ */
+function promptUser(question: string): Promise<string> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
 
 program
   .name("glidecapture")
@@ -25,11 +39,15 @@ program
   .option("--no-click", "Disable clicking interactive elements to discover content")
   .option("--headed", "Run browser in headed (visible) mode")
   .option("--login-url <url>", "Login page URL")
-  .option("--login-user-selector <sel>", "CSS selector for username field", "#username, #email, [name=email], [name=username]")
-  .option("--login-pass-selector <sel>", "CSS selector for password field", "#password, [name=password], [type=password]")
-  .option("--login-submit-selector <sel>", "CSS selector for login submit button", '[type=submit], button[type=submit], .login-btn')
-  .option("--login-username <user>", "Login username/email")
-  .option("--login-password <pass>", "Login password")
+  .option("--login-flow <type>", "Login flow type: password or verification-code", "verification-code")
+  .option("--login-email <email>", "Login email address")
+  .option("--login-email-selector <sel>", "CSS selector for the email input", '#email, [name=email], [type=email], #username, [name=username]')
+  .option("--login-email-submit-selector <sel>", "CSS selector for the submit button after email entry", '[type=submit], button[type=submit], form button')
+  .option("--login-password <pass>", "Login password (password flow only)")
+  .option("--login-pass-selector <sel>", "CSS selector for password field (password flow)", '[type=password], #password, [name=password]')
+  .option("--login-pass-submit-selector <sel>", "CSS selector for submit after password")
+  .option("--login-code-selector <sel>", "CSS selector for the verification code input")
+  .option("--login-code-submit-selector <sel>", "CSS selector for submit after entering code")
   .option("--login-success-url <url>", "URL that confirms successful login")
   .action(async (startUrl: string, opts) => {
     console.log(chalk.bold("\n  GlideCapture"));
@@ -48,16 +66,32 @@ program
 
     // Build login config if provided
     let login: CrawlConfig["login"];
-    if (opts.loginUrl && opts.loginUsername && opts.loginPassword) {
+    if (opts.loginUrl && opts.loginEmail) {
+      const flow = opts.loginFlow === "password" ? "password" as const : "verification-code" as const;
       login = {
+        flow,
         loginUrl: opts.loginUrl,
-        usernameSelector: opts.loginUserSelector,
-        passwordSelector: opts.loginPassSelector,
-        submitSelector: opts.loginSubmitSelector,
-        username: opts.loginUsername,
+        email: opts.loginEmail,
+        emailSelector: opts.loginEmailSelector,
+        emailSubmitSelector: opts.loginEmailSubmitSelector,
+        // Password flow
         password: opts.loginPassword,
+        passwordSelector: opts.loginPassSelector,
+        passwordSubmitSelector: opts.loginPassSubmitSelector,
+        // Verification code flow
+        codeSelector: opts.loginCodeSelector,
+        codeSubmitSelector: opts.loginCodeSubmitSelector,
         successUrl: opts.loginSuccessUrl,
+        // Interactive prompt for verification code
+        promptForCode: flow === "verification-code"
+          ? () => promptUser(chalk.yellow("\n  >> A verification code was sent to your email.\n  >> Enter the code: "))
+          : undefined,
       };
+
+      if (flow === "password" && !opts.loginPassword) {
+        console.error(chalk.red("  --login-password is required for password login flow"));
+        process.exit(1);
+      }
     }
 
     const config: CrawlConfig = {
@@ -81,7 +115,11 @@ program
     console.log(chalk.dim(`    Output:        ${config.outputDir}`));
     console.log(chalk.dim(`    Click explore: ${config.clickInteractive}`));
     console.log(chalk.dim(`    Headless:      ${config.headless}`));
-    if (login) console.log(chalk.dim(`    Login:         ${login.loginUrl}`));
+    if (login) {
+      console.log(chalk.dim(`    Login:         ${login.loginUrl}`));
+      console.log(chalk.dim(`    Login flow:    ${login.flow}`));
+      console.log(chalk.dim(`    Login email:   ${login.email}`));
+    }
     console.log();
 
     // Phase 1: Crawl

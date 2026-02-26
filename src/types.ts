@@ -127,18 +127,33 @@ export interface CrawlConfig {
 }
 
 export interface LoginConfig {
+  /** Login flow type */
+  flow: "password" | "verification-code";
   /** URL of the login page */
   loginUrl: string;
-  /** CSS selector for the username/email field */
-  usernameSelector: string;
-  /** CSS selector for the password field */
-  passwordSelector: string;
-  /** CSS selector for the submit button */
-  submitSelector: string;
-  /** Username value */
-  username: string;
-  /** Password value */
-  password: string;
+  /** CSS selector for the email/username field */
+  emailSelector: string;
+  /** Email/username value */
+  email: string;
+  /** CSS selector for the submit/next button on the email step */
+  emailSubmitSelector: string;
+
+  // --- Password flow fields ---
+  /** CSS selector for the password field (password flow only) */
+  passwordSelector?: string;
+  /** Password value (password flow only) */
+  password?: string;
+  /** CSS selector for the submit button on the password step (password flow only) */
+  passwordSubmitSelector?: string;
+
+  // --- Verification code flow fields ---
+  /** CSS selector for the verification code input (verification-code flow only) */
+  codeSelector?: string;
+  /** CSS selector for the submit button on the code step (verification-code flow only) */
+  codeSubmitSelector?: string;
+  /** Callback to prompt the user for the verification code at runtime */
+  promptForCode?: () => Promise<string>;
+
   /** URL to wait for after login (confirms success) */
   successUrl?: string;
 }

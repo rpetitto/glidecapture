@@ -50,10 +50,18 @@ npx tsx src/index.ts https://myapp.com \
   --output ./my-capture \
   --headed
 
-# With login (for authenticated apps)
+# With login — verification code (email + OTP)
+# The CLI will pause and prompt you to enter the code
 npx tsx src/index.ts https://myapp.com/dashboard \
   --login-url https://myapp.com/login \
-  --login-username admin@example.com \
+  --login-email admin@example.com \
+  --headed
+
+# With login — password flow
+npx tsx src/index.ts https://myapp.com/dashboard \
+  --login-url https://myapp.com/login \
+  --login-flow password \
+  --login-email admin@example.com \
   --login-password secret123 \
   --login-success-url https://myapp.com/dashboard
 ```
@@ -71,11 +79,15 @@ npx tsx src/index.ts https://myapp.com/dashboard \
 | `--no-click` | — | Skip clicking buttons/tabs to discover dynamic content |
 | `--headed` | — | Show the browser window |
 | `--login-url` | — | Login page URL |
-| `--login-username` | — | Login username/email |
-| `--login-password` | — | Login password |
-| `--login-user-selector` | auto | CSS selector for username input |
+| `--login-flow` | `verification-code` | Login flow: `verification-code` or `password` |
+| `--login-email` | — | Login email address |
+| `--login-email-selector` | auto | CSS selector for email input |
+| `--login-email-submit-selector` | auto | CSS selector for submit after email |
+| `--login-password` | — | Password (password flow only) |
 | `--login-pass-selector` | auto | CSS selector for password input |
-| `--login-submit-selector` | auto | CSS selector for submit button |
+| `--login-pass-submit-selector` | — | CSS selector for submit after password |
+| `--login-code-selector` | auto | CSS selector for verification code input |
+| `--login-code-submit-selector` | — | CSS selector for submit after code |
 | `--login-success-url` | — | URL to confirm login success |
 
 ## Output Structure

@@ -231,18 +231,54 @@ async function discoverViaInteraction(
 }
 
 /**
- * Perform login before crawling.
+ * Perform login before crawling. Supports two flows:
+ * - "password": email → password → submit
+ * - "verification-code": email → submit → wait for user to provide code → submit
  */
 async function performLogin(page: Page, config: CrawlConfig): Promise<void> {
   const login = config.login!;
-  await page.goto(login.loginUrl, { waitUntil: "networkidle", timeout: 30000 });
-  await page.fill(login.usernameSelector, login.username);
-  await page.fill(login.passwordSelector, login.password);
-  await page.click(login.submitSelector);
 
-  if (login.successUrl) {
-    await page.waitForURL(login.successUrl, { timeout: 15000 });
+  // Step 1: Navigate to login page and enter email
+  await page.goto(login.loginUrl, { waitUntil: "networkidle", timeout: 30000 });
+
+  // Try to find and fill the email field, waiting for it to be visible
+  await page.waitForSelector(login.emailSelector, { state: "visible", timeout: 10000 });
+  await page.fill(login.emailSelector, login.email);
+  await page.click(login.emailSubmitSelector);
+
+  // Wait for the page to react (next form step, redirect, etc.)
+  await page.waitForTimeout(3000);
+
+  if (login.flow === "password") {
+    // Step 2a: Password flow — fill password and submit
+    const passSel = login.passwordSelector ?? '[type=password]';
+    await page.waitForSelector(passSel, { state: "visible", timeout: 10000 });
+    await page.fill(passSel, login.password ?? "");
+    const passSubmitSel = login.passwordSubmitSelector ?? login.emailSubmitSelector;
+    await page.click(passSubmitSel);
   } else {
-    await page.waitForNavigation({ waitUntil: "networkidle", timeout: 15000 }).catch(() => {});
+    // Step 2b: Verification code flow — prompt user and enter code
+    if (!login.promptForCode) {
+      throw new Error("Login flow is 'verification-code' but no promptForCode callback provided");
+    }
+
+    const code = await login.promptForCode();
+
+    // Find the code input — try the configured selector, then common patterns
+    const codeSel = login.codeSelector ?? 'input[name="code"], input[type="number"], input[autocomplete="one-time-code"], input[inputmode="numeric"]';
+    await page.waitForSelector(codeSel, { state: "visible", timeout: 30000 });
+    await page.fill(codeSel, code);
+
+    const codeSubmitSel = login.codeSubmitSelector ?? login.emailSubmitSelector;
+    await page.click(codeSubmitSel);
+  }
+
+  // Step 3: Wait for login to complete
+  if (login.successUrl) {
+    await page.waitForURL(login.successUrl, { timeout: 30000 });
+  } else {
+    await page.waitForNavigation({ waitUntil: "networkidle", timeout: 30000 }).catch(() => {});
+    // Extra wait for SPAs that redirect client-side
+    await page.waitForTimeout(2000);
   }
 }

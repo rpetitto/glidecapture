@@ -37,6 +37,13 @@ npm install
 npx playwright install chromium
 ```
 
+### Glide MCP server (optional)
+
+`.mcp.json` registers the Glide MCP server for this project, so Claude Code can
+build a Glide app directly from the captured schema. Claude Code will prompt to
+approve the server the first time you open the repo; then run `/mcp` and select
+`glide` to authorize it. Each person who clones the repo authorizes separately.
+
 ## Usage
 
 ```bash
